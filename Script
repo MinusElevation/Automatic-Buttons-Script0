@@ -5,8 +5,9 @@ local player = Players.LocalPlayer
 
 local allowedModels = {
     ["X"] = true,
-    ["Button"] = true,
     ["X"] = true,
+    ["Button"] = true,
+    ["ThornBush"] = true,
 }
 
 local activationDistance = 100
