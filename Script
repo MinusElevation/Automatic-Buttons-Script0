@@ -1,0 +1,36 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+
+local allowedModels = {
+    ["X"] = true,
+    ["Button"] = true,
+    ["X"] = true,
+}
+
+local activationDistance = 100
+
+local function getRoot()
+    local char = player.Character or player.CharacterAdded:Wait()
+    return char:WaitForChild("HumanoidRootPart", 5)
+end
+
+local function isInAllowedModel(prompt)
+    local model = prompt:FindFirstAncestorWhichIsA("Model")
+    return model and allowedModels[model.Name]
+end
+
+RunService.RenderStepped:Connect(function()
+    local root = getRoot()
+    if not root then return end
+
+    for _, prompt in ipairs(workspace:GetDescendants()) do
+        if prompt:IsA("ProximityPrompt") and prompt.Enabled and isInAllowedModel(prompt) then
+            local distance = (prompt.Parent.Position - root.Position).Magnitude
+            if distance <= activationDistance then
+                fireproximityprompt(prompt)
+            end
+        end
+    end
+end)
