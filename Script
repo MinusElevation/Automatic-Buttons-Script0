@@ -1,16 +1,21 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 
 local allowedModels = {
     ["X"] = true,
     ["X"] = true,
+    ["X"] = true,
+    ["ScrapPile"] = true,
+    ["Scrap"] = true,
     ["Button"] = true,
     ["ThornBush"] = true,
 }
 
-local activationDistance = 100
+local activationDistance = 500
+local autoActivate = true
 
 local function getRoot()
     local char = player.Character or player.CharacterAdded:Wait()
@@ -22,16 +27,103 @@ local function isInAllowedModel(prompt)
     return model and allowedModels[model.Name]
 end
 
+local function hasBlockedParticle(model)
+    local hitbox = model:FindFirstChild("Hitbox", true)
+    if hitbox and hitbox:IsA("BasePart") then
+        return hitbox:FindFirstChild("AnglerTrapParticle") ~= nil
+    end
+    return false
+end
+
+local function createUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "AutoPromptGUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = player:WaitForChild("PlayerGui")
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 200, 0, 100)
+    frame.Position = UDim2.new(0, 20, 0, 100)
+    frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    frame.BorderSizePixel = 0
+    frame.BackgroundTransparency = 0.1
+    frame.Active = true
+    frame.Parent = screenGui
+
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(1, -20, 0, 40)
+    toggle.Position = UDim2.new(0, 10, 0, 10)
+    toggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    toggle.TextColor3 = Color3.new(1,1,1)
+    toggle.TextScaled = true
+    toggle.Text = "Auto: ON"
+    toggle.Parent = frame
+
+    local close = Instance.new("TextButton")
+    close.Size = UDim2.new(0, 20, 0, 20)
+    close.Position = UDim2.new(1, -25, 0, 5)
+    close.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+    close.TextColor3 = Color3.new(1,1,1)
+    close.Text = "X"
+    close.TextScaled = true
+    close.Parent = frame
+
+    toggle.MouseButton1Click:Connect(function()
+        autoActivate = not autoActivate
+        toggle.Text = "Auto: " .. (autoActivate and "ON" or "OFF")
+    end)
+
+    close.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+    end)
+
+    local dragging = false
+    local dragStart, startPos
+
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or
+           input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
+    end)
+
+    frame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or
+           input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
 RunService.RenderStepped:Connect(function()
+    if not autoActivate then return end
+
     local root = getRoot()
     if not root then return end
 
     for _, prompt in ipairs(workspace:GetDescendants()) do
         if prompt:IsA("ProximityPrompt") and prompt.Enabled and isInAllowedModel(prompt) then
-            local distance = (prompt.Parent.Position - root.Position).Magnitude
-            if distance <= activationDistance then
-                fireproximityprompt(prompt)
+            local model = prompt:FindFirstAncestorWhichIsA("Model")
+            if model and not hasBlockedParticle(model) then
+                local distance = (prompt.Parent.Position - root.Position).Magnitude
+                if distance <= activationDistance then
+                    fireproximityprompt(prompt)
+                end
             end
         end
     end
 end)
+
+createUI()
